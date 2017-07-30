@@ -1,100 +1,112 @@
 import React from 'react';
+import { Modal, StyleSheet, View } from 'react-native';
 import {
   Button,
-  DrawerLayoutAndroid,
-  FlatList,
-  StyleSheet,
-  Text,
-  TextInput,
-  ToastAndroid,
-  View
-} from 'react-native';
+  FormInput,
+  FormLabel,
+  Header,
+  Icon,
+  List,
+  ListItem,
+  Text
+} from 'react-native-elements';
 
 export default class App extends React.Component {
   constructor(props, ctx) {
     super(props, ctx);
 
     this.handlePress = this.handlePress.bind(this);
+    this.toggleSwitch = this.toggleSwitch.bind(this);
 
     this.state = {
-      inputValue: '',
+      descriptionInput: '',
+      modalVisible: false,
+      titleInput: '',
       todoItems: [
         {
-          key: 1,
           title: 'Shopping',
-          description: 'Milk'
+          description: 'Milk',
+          switched: false
         },
         {
-          key: 2,
           title: '13:00',
-          description: 'Hair cut'
+          description: 'Hair cut',
+          switched: false
         }
       ]
     };
   }
 
-  componentWillMount() {
-    ToastAndroid.show('Component will mount', ToastAndroid.SHORT);
-  }
-
-  componentDidMount() {
-    ToastAndroid.show('Component did mount', ToastAndroid.SHORT);
-  }
-
-  componentDidUpdate() {
-    ToastAndroid.show('Component updated', ToastAndroid.SHORT);
-  }
-
   handlePress() {
     const todoItems = this.state.todoItems.concat();
-    const lastKey = todoItems[todoItems.length - 1].key;
     this.setState({
+      descriptionInput: '',
+      modalVisible: false,
+      titleInput: '',
       todoItems: todoItems.concat([{
-        key: lastKey + 1,
-        title: this.state.inputValue
-      }]),
-      inputValue: ''
+        title: this.state.titleInput,
+        description: this.state.descriptionInput,
+        switched: false
+      }])
+    });
+  }
+
+  toggleSwitch(index) {
+    const { todoItems } = this.state;
+    const todoItem = todoItems[index];
+
+    this.setState({
+      todoItems: [
+        ...todoItems.slice(0, index),
+        {
+          ...todoItem,
+          switched: !todoItem.switched
+        },
+        ...todoItems.slice(index + 1)
+      ]
     });
   }
 
   render() {
-    var navigationView = (
-      <View style={{flex: 1, backgroundColor: '#fff'}}>
-        <Text>I'm in the drawer</Text>
-      </View>
-    );
-
     return (
-      <DrawerLayoutAndroid
-        drawerWidth={300}
-        drawerPosition={DrawerLayoutAndroid.positions.Left}
-        renderNavigationView={() => navigationView}>
-        <View style={styles.container}>
-          <Text style={{ fontSize: 50 }}>To-Do</Text>
-          <TextInput
-            style={{ width: 200, fontSize: 40 }}
-            onChangeText={(text) => this.setState({ inputValue: text })}
-            value={this.state.inputValue}
-          />
-          <Button
-            onPress={this.handlePress}
-            title="Add"
-          />
-          <FlatList
-            data={this.state.todoItems}
-            renderItem={({item}) => <Text style={{ fontSize: 20 }}>{item.title}</Text>}
-          />
-        </View>
-      </DrawerLayoutAndroid>
+      <View>
+        <Modal
+          animationType="slide"
+          onRequestClose={() => this.setState({ modalVisible: false })}
+          transparent={false}
+          visible={this.state.modalVisible}>
+          <View>
+            <Text h4 style={{ textAlign: 'center' }}>Add To-Do Item</Text>
+            <FormLabel>Title</FormLabel>
+            <FormInput onChangeText={text => this.setState({ titleInput: text })} value={this.state.titleInput} />
+            <FormLabel>Description</FormLabel>
+            <FormInput onChangeText={text => this.setState({ descriptionInput: text })} value={this.state.descriptionInput} />
+            <Button onPress={this.handlePress} title="Add" buttonStyle={{ marginBottom: 5 }} backgroundColor="#009C6B"/>
+            <Button onPress={() => this.setState({ modalVisible: false })} title="Close" />
+          </View>
+        </Modal>
+
+        <Header
+          leftComponent={{ icon: 'menu' }}
+          centerComponent={{ text: 'To-Do List' }}
+          rightComponent={{ icon: 'add', onPress: () => this.setState({ modalVisible: true }) }}
+        />
+        <List containerStyle={{ marginTop: 70 }}>
+          {this.state.todoItems.map((todoItem, index) => (
+            <ListItem
+              hideChevron={true}
+              key={index}
+              onSwitch={this.toggleSwitch.bind(null, index)}
+              subtitle={todoItem.description}
+              subtitleStyle={{ color: todoItem.switched ? '#009C6B' : '#a3a3a3' }}
+              switched={todoItem.switched}
+              switchButton={true}
+              title={todoItem.title}
+              titleStyle={{ color: todoItem.switched ? '#009C6B' : '#000000' }}
+            />
+          ))}
+        </List>
+      </View>
     );
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
