@@ -16,8 +16,10 @@ export default class App extends React.Component {
   constructor(props, ctx) {
     super(props, ctx);
 
+    this.editTodo = this.editTodo.bind(this);
     this.getTodos = this.getTodos.bind(this);
-    this.handlePress = this.handlePress.bind(this);
+    this.handlePressAdd = this.handlePressAdd.bind(this);
+    this.handlePressEdit = this.handlePressEdit.bind(this);
     this.renderRow = this.renderRow.bind(this);
     this.toggleSwitch = this.toggleSwitch.bind(this);
 
@@ -26,6 +28,8 @@ export default class App extends React.Component {
       modalVisible: false,
       refreshing: false,
       titleInput: '',
+      editId: null,
+      mode: 'add',
       todoItems: []
     };
   }
@@ -37,7 +41,7 @@ export default class App extends React.Component {
   getTodos() {
     this.setState({ refreshing: true });
 
-    return axios.get('http://10.0.0.11:3009/api/todos')
+    return axios.get('http://192.168.200.103:3009/api/todos')
       .then(response => {
         const todos = response.data;
         
@@ -59,14 +63,34 @@ export default class App extends React.Component {
       });
   }
 
-  handlePress() {
+  handlePressEdit() {
+    axios.put(`http://192.168.200.103:3009/api/todos/${this.state.editId}`, {
+      title: this.state.titleInput,
+      description: this.state.descriptionInput
+    })
+      .then(response => {
+        ToastAndroid.show(response.data.message, ToastAndroid.SHORT);
+
+        this.setState({
+          descriptionInput: '',
+          modalVisible: false,
+          titleInput: '',
+          editId: null,
+          mode: 'add'
+        }, () => {
+          this.getTodos();
+        });
+      });
+  }
+
+  handlePressAdd() {
     const todoItems = this.state.todoItems.concat();
     const payload = {
       title: this.state.titleInput,
       description: this.state.descriptionInput
     };
 
-    axios.post('http://10.0.0.11:3009/api/todos', payload)
+    axios.post('http://192.168.200.103:3009/api/todos', payload)
       .then(response => {
         ToastAndroid.show(response.data.message, ToastAndroid.SHORT);
 
@@ -96,11 +120,23 @@ export default class App extends React.Component {
     });
   }
 
+  editTodo(index) {
+    const todo = this.state.todoItems[index];
+
+    this.setState({
+      modalVisible: true,
+      titleInput: todo.title,
+      descriptionInput: todo.description,
+      mode: 'edit',
+      editId: todo.id
+    });
+  }
+
   renderRow({ item, index }) {
     return (
       <ListItem
         hideChevron={true}
-        onPress={this.toggleSwitch.bind(null, index)}
+        onPress={this.editTodo.bind(null, index)}
         onSwitch={this.toggleSwitch.bind(null, index)}
         subtitle={item.description}
         subtitleStyle={{ color: item.switched ? '#009C6B' : '#a3a3a3' }}
@@ -117,17 +153,17 @@ export default class App extends React.Component {
       <View>
         <Modal
           animationType="slide"
-          onRequestClose={() => this.setState({ modalVisible: false })}
+          onRequestClose={() => this.setState({ modalVisible: false, mode: 'add' })}
           transparent={false}
           visible={this.state.modalVisible}>
           <View>
-            <Text h4 style={{ textAlign: 'center' }}>Add To-Do Item</Text>
+            <Text h4 style={{ textAlign: 'center' }}>{this.state.mode === 'add' ? 'Add' : 'Edit'} To-Do Item</Text>
             <FormLabel>Title</FormLabel>
             <FormInput onChangeText={text => this.setState({ titleInput: text })} value={this.state.titleInput} />
             <FormLabel>Description</FormLabel>
             <FormInput onChangeText={text => this.setState({ descriptionInput: text })} value={this.state.descriptionInput} />
-            <Button onPress={this.handlePress} title="Add" buttonStyle={{ marginBottom: 5 }} backgroundColor="#009C6B"/>
-            <Button onPress={() => this.setState({ modalVisible: false })} title="Close" />
+            <Button onPress={this.state.mode === 'add' ? this.handlePressAdd : this.handlePressEdit} title={this.state.mode === 'add' ? 'Add' : 'Save'} buttonStyle={{ marginBottom: 5 }} backgroundColor="#009C6B"/>
+            <Button onPress={() => this.setState({ modalVisible: false, mode: 'add', descriptionInput: '', titleInput: '', editId: '' })} title="Close" />
           </View>
         </Modal>
 
