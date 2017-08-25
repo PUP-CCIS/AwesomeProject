@@ -1,100 +1,187 @@
 import React from 'react';
+import { FlatList, Modal, StyleSheet, ToastAndroid, View } from 'react-native';
 import {
   Button,
-  DrawerLayoutAndroid,
-  FlatList,
-  StyleSheet,
-  Text,
-  TextInput,
-  ToastAndroid,
-  View
-} from 'react-native';
+  FormInput,
+  FormLabel,
+  Header,
+  Icon,
+  List,
+  ListItem,
+  Text
+} from 'react-native-elements';
+import axios from 'axios';
 
 export default class App extends React.Component {
   constructor(props, ctx) {
     super(props, ctx);
 
-    this.handlePress = this.handlePress.bind(this);
+    this.editTodo = this.editTodo.bind(this);
+    this.getTodos = this.getTodos.bind(this);
+    this.handlePressAdd = this.handlePressAdd.bind(this);
+    this.handlePressEdit = this.handlePressEdit.bind(this);
+    this.renderRow = this.renderRow.bind(this);
+    this.toggleSwitch = this.toggleSwitch.bind(this);
 
     this.state = {
-      inputValue: '',
-      todoItems: [
-        {
-          key: 1,
-          title: 'Shopping',
-          description: 'Milk'
-        },
-        {
-          key: 2,
-          title: '13:00',
-          description: 'Hair cut'
-        }
-      ]
+      descriptionInput: '',
+      modalVisible: false,
+      refreshing: false,
+      titleInput: '',
+      editId: null,
+      mode: 'add',
+      todoItems: []
     };
   }
 
-  componentWillMount() {
-    ToastAndroid.show('Component will mount', ToastAndroid.SHORT);
-  }
-
   componentDidMount() {
-    ToastAndroid.show('Component did mount', ToastAndroid.SHORT);
+    this.getTodos();
   }
 
-  componentDidUpdate() {
-    ToastAndroid.show('Component updated', ToastAndroid.SHORT);
+  getTodos() {
+    this.setState({ refreshing: true });
+
+    return axios.get('http://192.168.200.103:3009/api/todos')
+      .then(response => {
+        const todos = response.data;
+        
+        this.setState({
+          refreshing: false,
+          todoItems: todos.map(function (todo) {
+            return {
+              id: todo.id,
+              title: todo.title,
+              description: todo.description,
+              switched: !!todo.done
+            };
+          })
+        });
+      })
+      .catch(err => {
+        this.setState({ refreshing: false });
+        ToastAndroid.show(err.toString(), ToastAndroid.SHORT);
+      });
   }
 
-  handlePress() {
+  handlePressEdit() {
+    axios.put(`http://192.168.200.103:3009/api/todos/${this.state.editId}`, {
+      title: this.state.titleInput,
+      description: this.state.descriptionInput
+    })
+      .then(response => {
+        ToastAndroid.show(response.data.message, ToastAndroid.SHORT);
+
+        this.setState({
+          descriptionInput: '',
+          modalVisible: false,
+          titleInput: '',
+          editId: null,
+          mode: 'add'
+        }, () => {
+          this.getTodos();
+        });
+      });
+  }
+
+  handlePressAdd() {
     const todoItems = this.state.todoItems.concat();
-    const lastKey = todoItems[todoItems.length - 1].key;
+    const payload = {
+      title: this.state.titleInput,
+      description: this.state.descriptionInput
+    };
+
+    axios.post('http://192.168.200.103:3009/api/todos', payload)
+      .then(response => {
+        ToastAndroid.show(response.data.message, ToastAndroid.SHORT);
+
+        this.setState({
+          descriptionInput: '',
+          modalVisible: false,
+          titleInput: ''
+        })
+      })
+      .catch(err => ToastAndroid.show(err.response.data.error, ToastAndroid.LONG))
+      .then(this.getTodos);
+  }
+
+  toggleSwitch(index) {
+    const { todoItems } = this.state;
+    const todoItem = todoItems[index];
+
     this.setState({
-      todoItems: todoItems.concat([{
-        key: lastKey + 1,
-        title: this.state.inputValue
-      }]),
-      inputValue: ''
+      todoItems: [
+        ...todoItems.slice(0, index),
+        {
+          ...todoItem,
+          switched: !todoItem.switched
+        },
+        ...todoItems.slice(index + 1)
+      ]
     });
   }
 
-  render() {
-    var navigationView = (
-      <View style={{flex: 1, backgroundColor: '#fff'}}>
-        <Text>I'm in the drawer</Text>
-      </View>
-    );
+  editTodo(index) {
+    const todo = this.state.todoItems[index];
 
+    this.setState({
+      modalVisible: true,
+      titleInput: todo.title,
+      descriptionInput: todo.description,
+      mode: 'edit',
+      editId: todo.id
+    });
+  }
+
+  renderRow({ item, index }) {
     return (
-      <DrawerLayoutAndroid
-        drawerWidth={300}
-        drawerPosition={DrawerLayoutAndroid.positions.Left}
-        renderNavigationView={() => navigationView}>
-        <View style={styles.container}>
-          <Text style={{ fontSize: 50 }}>To-Do</Text>
-          <TextInput
-            style={{ width: 200, fontSize: 40 }}
-            onChangeText={(text) => this.setState({ inputValue: text })}
-            value={this.state.inputValue}
-          />
-          <Button
-            onPress={this.handlePress}
-            title="Add"
-          />
+      <ListItem
+        hideChevron={true}
+        onPress={this.editTodo.bind(null, index)}
+        onSwitch={this.toggleSwitch.bind(null, index)}
+        subtitle={item.description}
+        subtitleStyle={{ color: item.switched ? '#009C6B' : '#a3a3a3' }}
+        switched={item.switched}
+        switchButton={true}
+        title={item.title}
+        titleStyle={{ color: item.switched ? '#009C6B' : '#000000' }}
+      />
+    );
+  }
+
+  render() {
+    return (
+      <View>
+        <Modal
+          animationType="slide"
+          onRequestClose={() => this.setState({ modalVisible: false, mode: 'add' })}
+          transparent={false}
+          visible={this.state.modalVisible}>
+          <View>
+            <Text h4 style={{ textAlign: 'center' }}>{this.state.mode === 'add' ? 'Add' : 'Edit'} To-Do Item</Text>
+            <FormLabel>Title</FormLabel>
+            <FormInput onChangeText={text => this.setState({ titleInput: text })} value={this.state.titleInput} />
+            <FormLabel>Description</FormLabel>
+            <FormInput onChangeText={text => this.setState({ descriptionInput: text })} value={this.state.descriptionInput} />
+            <Button onPress={this.state.mode === 'add' ? this.handlePressAdd : this.handlePressEdit} title={this.state.mode === 'add' ? 'Add' : 'Save'} buttonStyle={{ marginBottom: 5 }} backgroundColor="#009C6B"/>
+            <Button onPress={() => this.setState({ modalVisible: false, mode: 'add', descriptionInput: '', titleInput: '', editId: '' })} title="Close" />
+          </View>
+        </Modal>
+
+        <Header
+          leftComponent={{ icon: 'menu' }}
+          centerComponent={{ text: 'To-Do List' }}
+          rightComponent={{ icon: 'add', onPress: () => this.setState({ modalVisible: true }) }}
+        />
+        <List containerStyle={{ marginTop: 70 }}>
           <FlatList
             data={this.state.todoItems}
-            renderItem={({item}) => <Text style={{ fontSize: 20 }}>{item.title}</Text>}
+            keyExtractor={item => item.id}
+            onRefresh={this.getTodos}
+            refreshing={this.state.refreshing}
+            renderItem={this.renderRow}
           />
-        </View>
-      </DrawerLayoutAndroid>
+        </List>
+      </View>
     );
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
